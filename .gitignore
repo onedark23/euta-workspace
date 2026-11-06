@@ -1,0 +1,18 @@
+# 로컬 세션 상태 (공유 대상 아님)
+.claude/settings.local.json
+.claude/.ctx_state
+.DS_Store
+# task 스킬 활성 마커 · 판정 대기 (개인 영역)
+.ctx/task/
+# 참고 자료 중 외부 노출 금지분은 로컬 한정
+95.참고/
+# ctx lane 상태·이력 (개인 영역)
+.ctx/
+# 회사 내용 — 정본은 사내 Confluence(비공개). 공개 저장소에 올리지 않는다 (ADR-045).
+# 로컬 사본은 작업용이며 pdoc confluence_sync 로 받아 온다.
+10.사업기획/
+22.회의록/
+23.보고/
+41.가이드_정책/
+90.운영/
+# 실사용 대상 서비스의 테스트 문서 패턴은 .git/info/exclude(로컬 전용)에 둔다.
