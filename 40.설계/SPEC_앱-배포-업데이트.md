@@ -38,6 +38,7 @@ ref:
 | Windows x64 | NSIS `.exe` | 같은 `.exe` + `latest.yml` (차등 블록맵) |
 | Linux x64 | `.AppImage` | 같은 `.AppImage` + `latest-linux.yml` (AppImage 는 electron-updater 자동 업데이트 지원, 서명 불필요) |
 
+- **릴리스는 태그 push 로 자동**(2026-11-10, [ADR-048](ADR_048_앱-릴리스-자동화.md)): 앱 레포에 `app-v<버전>` 태그를 올리면 GitHub Actions(`.github/workflows/release.yml`)가 빌드 · 게시한다 — macOS 러너가 맥 arm64 · x64 와 Windows x64(교차, 아래와 같음), Ubuntu 러너가 Linux x64(그 자리에서 node-pty 컴파일). 엔진은 같은 위치에 `onedark23/euta-engine` 을 받는다(기본 `main`, 실행 입력으로 바꿈). 모든 빌드가 끝나면 한 작업이 `release:github --publish` 로 게시. 버전 · `RELEASES.md` 절이 없거나 태그와 버전이 다르면 빌드 전에 멈춘다. 아래 "이 맥에서 빌드" 는 예비 경로로 남는다.
 - **모든 플랫폼을 이 맥에서 빌드**한다. 네이티브 모듈 중 `robotjs` 는 darwin/win32/linux prebuild 를 포함하고, `node-pty` 는 darwin/win32 prebuild 만 있어 **Linux 는 Docker(`electronuserland/builder`, linux/amd64)에서 Electron 용으로 컴파일**한다. SQLite 는 Node 내장. 번들 Claude CLI 는 대상 플랫폼 패키지(`claude-agent-sdk-<os>-<cpu>`)를 stage 에 따로 설치한다. Windows 설치 파일(NSIS)은 이 맥(macOS 10.15+)에서 electron-builder 26 이 Wine 없이 만들도록 설정했다(언인스톨러 추출 · 리소스 편집이 JS — 코드 읽기 근거, **첫 실제 빌드에서 확인**, 안 되면 `electronuserland/builder:wine`, [ADR-042](ADR_042_앱-배포-업데이트-앱-구현.md)). 엔진은 지금처럼 tarball.
 - 명령: `pnpm release [--mac] [--win] [--linux]` → `release/<버전>/<mac|win|linux>/`, `EUTA_ADMIN_TOKEN=… pnpm release:upload [--mac|--win|--linux] [--publish]`(플랫폼을 나눠 같은 draft 에 올리고 마지막에 게시). 파일 이름 `euta-<버전>-<mac|win|linux>-<arm64|x64>.<ext>`(서버가 이름으로 분류). 맥 두 arch 는 한 번의 electron-builder 실행으로 만들어 `latest-mac.yml` 하나에 둘 다 적힌다. `latest*.yml` 의 `releaseNotes` = RELEASES.md 그 버전 절.
 - 교차 빌드는 실행 확인을 대신하지 못한다 — **Windows · Linux 는 실제 기기에서 설치·실행·업데이트 1회 확인**해야 배포한다(둘 다 지금까지 미검증). Windows PC 는 있음(사용자). Linux 는 Ubuntu 계열 데스크톱(X11) 기준 — OS 입력(`robotjs`)은 X11 에서만, Wayland 는 범위 밖.
@@ -74,6 +75,12 @@ ref:
 - 공개 경로(로그인 없이 — 앱이 로그인 전에도 업데이트를 받아야 함, 사내망 전용):
   - `GET /updates/<채널>/latest-mac.yml` · `latest.yml` · 파일 — electron-updater generic provider 형식 그대로
   - `GET /api/app/releases?channel=` — 버전 · 날짜 · 릴리스 노트 · 플랫폼별 설치 파일 주소(웹 화면 · 서명 없는 맥 앱이 씀)
+- **GitHub 에서 자동으로 가져오기**(미러, 2026-11-10, [ADR-048](ADR_048_앱-릴리스-자동화.md)): 서버 설정 `APP_MIRROR_GITHUB=<owner/repo>`(비면 끔)이면 서버가 시작 1분 뒤 · 10분마다(`APP_MIRROR_INTERVAL`) GitHub 최신 릴리스를 본다.
+  - 최신 태그: `https://github.com/<repo>/releases/latest` 가 넘겨 주는 주소에서 태그를 읽는다(GitHub API 아님). 그 태그의 `latest-mac.yml` · `latest.yml` · `latest-linux.yml`(없는 플랫폼은 건너뜀)의 버전이 서버에 없으면(초안 · 게시 모두) 가져온다.
+  - 파일: 각 yml 의 `files` 와 그 `.blockmap`, yml 자체를 `releases/download/<태그>/<이름>` 에서 받아 아래 "올리기" 와 같은 저장 · 검사(이름 규칙 · 1GiB · sha512 — yml 에 적힌 값과 다르면 실패)를 거쳐 초안에 넣고, 다 받으면 게시한다. 노트 = yml `releaseNotes`. 하나라도 실패하면 초안을 지우고 다음 주기에 다시.
+  - 관리자 웹 "릴리스 관리" 에 마지막 가져오기(시각 · 결과 · 버전)와 [지금 가져오기](`POST /api/admin/app-releases/mirror`)를 보인다. 한 번에 하나만 돈다.
+  - GitHub 에 공개된 것만 받는다(사내에만 먼저 배포는 수동 올리기로).
+  - 그 채널의 게시본보다 낮은 버전은 게시하지 않는다. 가져오는 도중 서버가 꺼져 남은 미러 초안은 45분 뒤 다음 실행이 지우고 다시 가져온다(관리자가 올린 초안은 그대로).
 - 올리기: 관리자만(관리자 계정의 **읽기·쓰기** 개인 토큰, 또는 관리자 웹 세션) — 앱 레포의 `pnpm release:upload` 가 빌드 산출물을 올린다. 같은 버전 다시 올리기는 거절(버전을 올린다).
   - 순서: `POST /api/admin/app-releases {version, notes}`(초안) → 파일마다 `PUT …/<버전>/files/<이름>`(본문 = 파일, 1개 최대 1GiB, 스트리밍 저장 · sha512) → `POST …/<버전>/publish`(`latest*.yml` 이 하나 이상 있어야 함). 초안은 `DELETE …/<버전>` 으로 지운다. 목록은 `GET /api/admin/app-releases`(초안 포함).
   - 게시 = DB 행 하나를 바꾸는 것 — `/updates/<채널>/<이름>` 은 "그 이름의 파일을 가진 가장 최근 게시본" 에서 나가므로 모든 `latest*.yml` 이 한 번에 바뀐다. 한 버전에 빠진 플랫폼은 직전 게시본 것이 계속 나간다. 게시하면서 채널별 4번째 이후 게시본은 행 · 파일을 지운다.
@@ -121,6 +128,8 @@ ref:
 - 화면 캡처 확인(UI 그라운드룰).
 
 ## Change Log
+
+### 2026-11-10 — 릴리스 자동화: 태그 `app-v*` → GitHub Actions 빌드(macOS 러너 = 맥 · Windows, Ubuntu 러너 = Linux) · 게시, 서버 미러는 `APP_MIRROR_GITHUB` 로 GitHub 최신 릴리스를 10분마다 가져와 게시(+ 관리자 [지금 가져오기]) — [ADR-048](ADR_048_앱-릴리스-자동화.md)
 
 ### 2026-11-09 — 업데이트 원본 두 곳(GitHub Releases 공개 기본 · euta cloud 서버 미러)과 고르는 규칙(`/api/config` `appUpdates`, 확인마다, 넘어가지 않음) · 두 원본 모두 generic 형식(GitHub `releases/latest/download/`, prerelease 표시 안 함) · 서명 없는 맥 알림도 `latest-mac.yml` 로 — [ADR-047](ADR_047_앱-업데이트-원본-선택.md)
 
