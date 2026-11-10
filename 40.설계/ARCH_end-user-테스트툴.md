@@ -185,7 +185,7 @@ index.sqlite        runs · steps · metrics 색인 (이력 검색·추이)
 - macOS · Windows · Linux(x64 데스크톱, 2026-10-30 추가) 대상. 검증은 macOS(arm64)만 — Windows · Linux 는 단계 17 에서 실기 확인.
 - Playwright 브라우저는 앱에 포함하지 않고 사용자 캐시를 쓴다(`euta install-browsers`).
 - OS 입력 어댑터: macOS 는 접근성·화면 기록 권한 필요(수동 검증 — [TEST_OS입력-어댑터_Plan](../60.테스트/TEST_OS입력-어댑터_Plan.md)), Windows 는 권한 불필요.
-- 앱 패키징: **개인 테스트용 `.app`**(ad-hoc 서명, 이 Mac 전용, `pnpm package`) — [ADR-014](ADR_014_개인-테스트용-앱-패키징.md). **사내 배포판**(단계 17): 릴리스 빌드(맥 arm64·x64 dmg/zip, Windows NSIS, Linux AppImage) · 업데이트는 euta cloud 서버에서 받고(서명 있으면 electron-updater 로 뒤에서, 서명 없는 맥은 알림 + 내려받기) · 클라우드 최소 앱 버전 미만이면 클라우드 기능만 잠금 — [SPEC_앱-배포-업데이트](SPEC_앱-배포-업데이트.md). 구현: `pnpm release`(OS 별 스테이징 — 대상 플랫폼 CLI 패키지 · 리눅스 node-pty 는 Docker 에서 Electron 헤더로 컴파일 · 맥 두 arch 한 번 빌드) · `pnpm release:upload`(draft → 파일 → 게시) · main 의 `AppUpdater`(30초 뒤 · 6시간마다 · 설정 버튼, 서명 여부는 빌드가 적은 `eutaBuild`) · 클라우드 요청마다 `X-Euta-App-Version`, `426` → 연결 상태 `app_too_old` — [ADR-042](ADR_042_앱-배포-업데이트-앱-구현.md).
+- 앱 패키징: **개인 테스트용 `.app`**(ad-hoc 서명, 이 Mac 전용, `pnpm package`) — [ADR-014](ADR_014_개인-테스트용-앱-패키징.md). **사내 배포판**(단계 17): 릴리스 빌드(맥 arm64·x64 dmg/zip, Windows NSIS, Linux AppImage) · 업데이트 원본은 확인마다 고른다 — 연결한 euta cloud 서버가 앱을 배포하면(`/api/config` `appUpdates`) 그 서버, 아니면 GitHub Releases([ADR-047](ADR_047_앱-업데이트-원본-선택.md)). 서명 있으면 electron-updater 로 뒤에서, 서명 없는 맥은 알림 + 내려받기. **릴리스 = 태그 `app-v<버전>` push → GitHub Actions 가 3플랫폼 빌드 · GitHub 게시, 서버 미러가 가져감**([ADR-048](ADR_048_앱-릴리스-자동화.md)). 첫 릴리스 `0.1.0-alpha.1`(2026-11-09) · 클라우드 최소 앱 버전 미만이면 클라우드 기능만 잠금 — [SPEC_앱-배포-업데이트](SPEC_앱-배포-업데이트.md). 구현: `pnpm release`(OS 별 스테이징 — 대상 플랫폼 CLI 패키지 · 리눅스 node-pty 는 Docker 에서 Electron 헤더로 컴파일 · 맥 두 arch 한 번 빌드) · `pnpm release:upload`(draft → 파일 → 게시) · main 의 `AppUpdater`(30초 뒤 · 6시간마다 · 설정 버튼, 서명 여부는 빌드가 적은 `eutaBuild`) · 클라우드 요청마다 `X-Euta-App-Version`, `426` → 연결 상태 `app_too_old` — [ADR-042](ADR_042_앱-배포-업데이트-앱-구현.md).
 
 ## 관련 문서
 
@@ -200,6 +200,8 @@ index.sqlite        runs · steps · metrics 색인 (이력 검색·추이)
 - 구현 세부 결정: `ADR_001` ~ `ADR_018` (이 폴더)
 
 ## Change Log
+
+### 2026-11-10 — 플랫폼: 업데이트 원본 고르기(GitHub · 클라우드 미러, ADR-047) · 릴리스 자동화(태그 → Actions, ADR-048) · 첫 릴리스 0.1.0-alpha.1
 
 ### 2026-11-05 — 단계 16-4 앱 구현 반영: TC 변환 자동 진행(`TcDocs` 루프 · 진행 띠 · [중지]) · AI 저장 전 검증 · 거절된 저장 버리기 보정 (ADR-046)
 
